@@ -14,7 +14,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("Nube de Emojis")
+st.title("🎨 Nube de Emojis HD")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -89,8 +89,8 @@ def hay_choque(
             (y - ey) ** 2
         )
 
-        # padding dinámico
-        padding = min(radio, er) * 0.10
+        # padding MUY pequeño para compactar
+        padding = min(radio, er) * 0.04
 
         distancia_minima = (
             radio + er + padding
@@ -178,26 +178,32 @@ def generar_nube(pesos):
         )
 
         # =============================================
-        # ESCALA NO LINEAL
+        # ESCALA MUY AGRESIVA
         # =============================================
 
         peso_normalizado = peso / 100
 
         escala = (
-            0.12 +
-            (peso_normalizado ** 1.8) * 0.52
+            0.04 +
+            (peso_normalizado ** 3.2) * 0.62
         )
 
-        # Nunca superar tamaño original
+        escala = max(0.05, escala)
+        escala = min(0.68, escala)
+
+        # =============================================
+        # TAMAÑO
+        # =============================================
+
         nuevo_w = int(512 * escala)
         nuevo_h = int(512 * escala)
 
         nuevo_w = min(nuevo_w, 512)
         nuevo_h = min(nuevo_h, 512)
 
-        # tamaño mínimo
-        nuevo_w = max(nuevo_w, 45)
-        nuevo_h = max(nuevo_h, 45)
+        # mínimo visual
+        nuevo_w = max(nuevo_w, 26)
+        nuevo_h = max(nuevo_h, 26)
 
         img = img_original.resize(
             (nuevo_w, nuevo_h),
@@ -207,10 +213,10 @@ def generar_nube(pesos):
         w, h = img.size
 
         # =============================================
-        # RADIO
+        # RADIO MÁS REAL
         # =============================================
 
-        radio = int(max(w, h) * 0.34)
+        radio = int(max(w, h) * 0.28)
 
         # =============================================
         # EMOJI PRINCIPAL
@@ -239,46 +245,48 @@ def generar_nube(pesos):
             continue
 
         # =============================================
-        # DISTRIBUCIÓN RADIAL CONTROLADA
+        # DISTRIBUCIÓN RADIAL COMPACTA
         # =============================================
 
         colocado = False
 
-        for intento in range(200):
+        for intento in range(300):
 
-            # distribución angular estable
+            # =========================================
+            # ÁNGULO ESTABLE
+            # =========================================
+
             angulo_base = (
                 (2 * math.pi / total_emojis)
                 * i
             )
 
-            # pequeño jitter
             angulo = (
                 angulo_base +
-                random.uniform(-0.18, 0.18)
+                random.uniform(-0.12, 0.12)
             )
 
-            # distancia desde el emoji principal
+            # =========================================
+            # DISTANCIA MUCHO MÁS COMPACTA
+            # =========================================
+
             radio_principal = elementos[0][2]
 
-            distancia_base = (
-                radio_principal +
-                radio
-            )
+            # emojis pequeños MUY pegados
+            factor_peso = 1.0 - peso_normalizado
 
-            # emojis pequeños más cerca
-            factor_peso = (
-                1.0 - peso_normalizado
+            distancia_base = (
+                radio_principal * 0.82 +
+                radio * 0.65
             )
 
             distancia = (
                 distancia_base +
-                (factor_peso * 55) +
-                random.uniform(-10, 10)
+                (factor_peso * 28)
             )
 
-            # si hay choque, expandir ligeramente
-            distancia += intento * 3
+            # expansión gradual mínima
+            distancia += intento * 1.2
 
             x = int(
                 centro_x +
@@ -320,8 +328,8 @@ def generar_nube(pesos):
 
         if not colocado:
 
-            x = centro_x + random.randint(-30, 30)
-            y = centro_y + random.randint(-30, 30)
+            x = centro_x + random.randint(-15, 15)
+            y = centro_y + random.randint(-15, 15)
 
             lienzo.paste(
                 img,
@@ -340,7 +348,7 @@ def generar_nube(pesos):
 
     if bbox:
 
-        padding = 40
+        padding = 25
 
         left, top, right, bottom = bbox
 
