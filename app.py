@@ -14,7 +14,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🎨 Nube de Emojis HD")
+st.title("Nube de Emojis")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -72,7 +72,7 @@ for emoji in EMOJIS_CONFIG:
     )
 
 # =====================================================
-# COLISIONES INTELIGENTES
+# COLISIONES
 # =====================================================
 
 def hay_choque(
@@ -90,7 +90,7 @@ def hay_choque(
         )
 
         # padding dinámico
-        padding = min(radio, er) * 0.12
+        padding = min(radio, er) * 0.10
 
         distancia_minima = (
             radio + er + padding
@@ -136,7 +136,7 @@ def generar_nube(pesos):
     centro_y = dim // 2
 
     # =================================================
-    # ORDENAR POR PESO
+    # ORDENAR
     # =================================================
 
     emojis_ordenados = sorted(
@@ -149,16 +149,18 @@ def generar_nube(pesos):
 
     primer = True
 
+    total_emojis = len(emojis_ordenados)
+
     # =================================================
     # LOOP PRINCIPAL
     # =================================================
 
-    for nombre, peso in emojis_ordenados:
+    for i, (nombre, peso) in enumerate(emojis_ordenados):
 
         config = EMOJIS_CONFIG[nombre]
 
         # =============================================
-        # ABRIR PNG ORIGINAL
+        # CARGAR ORIGINAL
         # =============================================
 
         img_original = Image.open(
@@ -186,14 +188,14 @@ def generar_nube(pesos):
             (peso_normalizado ** 1.8) * 0.52
         )
 
-        # nunca superar 512
+        # Nunca superar tamaño original
         nuevo_w = int(512 * escala)
         nuevo_h = int(512 * escala)
 
         nuevo_w = min(nuevo_w, 512)
         nuevo_h = min(nuevo_h, 512)
 
-        # protección mínima
+        # tamaño mínimo
         nuevo_w = max(nuevo_w, 45)
         nuevo_h = max(nuevo_h, 45)
 
@@ -205,13 +207,13 @@ def generar_nube(pesos):
         w, h = img.size
 
         # =============================================
-        # RADIO REAL
+        # RADIO
         # =============================================
 
         radio = int(max(w, h) * 0.34)
 
         # =============================================
-        # PRIMER EMOJI CENTRADO
+        # EMOJI PRINCIPAL
         # =============================================
 
         if primer:
@@ -237,24 +239,46 @@ def generar_nube(pesos):
             continue
 
         # =============================================
-        # DISTANCIA DINÁMICA
+        # DISTRIBUCIÓN RADIAL CONTROLADA
         # =============================================
-
-        max_dist = 220 - (peso_normalizado * 140)
 
         colocado = False
 
-        for _ in range(12000):
+        for intento in range(200):
 
-            angulo = random.uniform(
-                0,
-                2 * math.pi
+            # distribución angular estable
+            angulo_base = (
+                (2 * math.pi / total_emojis)
+                * i
             )
 
-            distancia = random.uniform(
-                radio * 0.35,
-                max_dist
+            # pequeño jitter
+            angulo = (
+                angulo_base +
+                random.uniform(-0.18, 0.18)
             )
+
+            # distancia desde el emoji principal
+            radio_principal = elementos[0][2]
+
+            distancia_base = (
+                radio_principal +
+                radio
+            )
+
+            # emojis pequeños más cerca
+            factor_peso = (
+                1.0 - peso_normalizado
+            )
+
+            distancia = (
+                distancia_base +
+                (factor_peso * 55) +
+                random.uniform(-10, 10)
+            )
+
+            # si hay choque, expandir ligeramente
+            distancia += intento * 3
 
             x = int(
                 centro_x +
@@ -296,8 +320,8 @@ def generar_nube(pesos):
 
         if not colocado:
 
-            x = centro_x + random.randint(-40, 40)
-            y = centro_y + random.randint(-40, 40)
+            x = centro_x + random.randint(-30, 30)
+            y = centro_y + random.randint(-30, 30)
 
             lienzo.paste(
                 img,
@@ -332,7 +356,7 @@ def generar_nube(pesos):
     return lienzo
 
 # =====================================================
-# BOTÓN GENERAR
+# BOTÓN
 # =====================================================
 
 if st.button("✨ Generar Nube"):
