@@ -76,7 +76,7 @@ def hay_choque(
     y,
     radio,
     elementos,
-    padding=20
+    padding=8
 ):
 
     for ex, ey, er in elementos:
@@ -190,7 +190,7 @@ def generar_nube(pesos):
 
         w, h = img.size
 
-        radio = int(max(w, h) * 0.42)
+        radio = int(max(w, h) * 0.34)
 
         # =============================================
         # PRIMER EMOJI
@@ -224,7 +224,7 @@ def generar_nube(pesos):
 
         colocado = False
 
-        for _ in range(6000):
+        for _ in range(12000):
 
             angulo = random.uniform(
                 0,
@@ -232,8 +232,8 @@ def generar_nube(pesos):
             )
 
             distancia = random.uniform(
-                radio + 20,
-                240
+                radio + 0.55,
+                170
             )
 
             x = int(
