@@ -31,14 +31,13 @@ def hay_choque(nueva_caja, cajas_ocupadas):
 
 def generar_nube(pesos):
     activos = {k: v for k, v in pesos.items() if v > 0}
-    if not activos: return Image.new("RGBA", (512, 512), (0,0,0,0))
     
-    # 1. Lienzo aumentado a 2400 para acomodar imágenes de 512px
-    dim = 2400 
+    # 1. Lienzo amplio (2000x2000) para evitar que los elementos se amontonen y pixelen.
+    # Esto permite que los emojis mantengan su resolución de 512x512.
+    dim = 2000 
     lienzo = Image.new("RGBA", (dim, dim), (255, 255, 255, 0))
     centro_x, centro_y = dim // 2, dim // 2
     
-    # IMPORTANTE: Corregí el key de sorted para que ordene por el VALOR (peso)
     emojis_ordenados = sorted(activos.items(), key=lambda item: item, reverse=True)
     cajas_ocupadas = []
 
@@ -46,34 +45,41 @@ def generar_nube(pesos):
         config = EMOJIS_CONFIG[nombre]
         img = Image.open(config["file"]).convert("RGBA")
         
-        # Escala: peso 0 -> 30% de 512px, peso 99 -> 100% de 512px
-        escala = 0.3 + (peso / 99.0) * 0.7
+        # 2. Ajuste de tamaño proporcional sin perder calidad
+        # Usamos 512 como base. Si el peso es bajo, el emoji es pequeño pero mantiene nitidez.
+        escala = 0.4 + (peso / 99.0) * 0.6 
         nuevo_size = int(512 * escala)
+        
+        # Usamos Resampling.LANCZOS para mantener bordes suaves en alta definición
         img = img.resize((nuevo_size, nuevo_size), Image.Resampling.LANCZOS)
         img = img.rotate(config["angle"], expand=True)
         new_w, new_h = img.size
         
-        # 2. Gravedad adaptada al nuevo tamaño
-        factor_gravedad = 1.0 - (peso / 99.0)
-        max_dist = 500 * factor_gravedad # Radio ampliado para imágenes grandes
+        # 3. Gravedad controlada
+        # Los más pesados buscan el centro, pero con un radio que les permite no superponerse
+        max_dist = 400 * (1.0 - (peso / 100.0))
         
-        for _ in range(500):
+        for _ in range(1000): # Más intentos para asegurar una posición sin choques
             theta = random.uniform(0, 2 * math.pi)
             r = random.uniform(0, max_dist)
-            x = int(centro_x + r * math.cos(theta) - new_w / 2)
-            y = int(centro_y + r * math.sin(theta) - new_h / 2)
+            x = int(centro_x + r * math.cos(theta) - new_w // 2)
+            y = int(centro_y + r * math.sin(theta) - new_h // 2)
             
-            margen = int(new_w * 0.15)
-            caja = (x + margen, y + margen, x + new_w - margen, y + new_h - margen)
-            
+            caja = (x, y, x + new_w, y + new_h)
             if not hay_choque(caja, cajas_ocupadas):
                 lienzo.paste(img, (x, y), img)
                 cajas_ocupadas.append(caja)
                 break
                 
-    # 3. Recorte final de alta precisión
+    # 4. Recorte ajustado al contenido para no desperdiciar espacio
     bbox = lienzo.getbbox()
-    return lienzo.crop(bbox) if bbox else lienzo
+    # Añadimos un pequeño margen (padding) de 50px para que no queden pegados al borde
+    if bbox:
+        padding = 50
+        bbox = (max(0, bbox-padding), max(0, bbox-padding), 
+                min(dim, bbox+padding), min(dim, bbox+padding))
+        return lienzo.crop(bbox)
+    return lienzo
 
 # --- Renderizado ---
 if st.button("Generar Nube HD"):
