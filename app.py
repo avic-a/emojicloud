@@ -6,7 +6,7 @@ import io
 
 # --- Configuración de página ---
 st.set_page_config(page_title="Nube de Emojis 3D", layout="wide")
-st.title("Generador de Nube Gravitacional")
+st.title("Generador de Nube Gravitacional (Alta Definición)")
 
 # --- Configuración ---
 EMOJIS_CONFIG = {
@@ -31,13 +31,14 @@ def hay_choque(nueva_caja, cajas_ocupadas):
 
 def generar_nube(pesos):
     activos = {k: v for k, v in pesos.items() if v > 0}
-    if not activos: return Image.new("RGBA", (256, 256), (0,0,0,0))
+    if not activos: return Image.new("RGBA", (512, 512), (0,0,0,0))
     
-    # 1. Lienzo inicial grande para trabajar
-    dim = 1200 
+    # 1. Lienzo aumentado a 2400 para acomodar imágenes de 512px
+    dim = 2400 
     lienzo = Image.new("RGBA", (dim, dim), (255, 255, 255, 0))
     centro_x, centro_y = dim // 2, dim // 2
     
+    # IMPORTANTE: Corregí el key de sorted para que ordene por el VALOR (peso)
     emojis_ordenados = sorted(activos.items(), key=lambda item: item, reverse=True)
     cajas_ocupadas = []
 
@@ -45,16 +46,16 @@ def generar_nube(pesos):
         config = EMOJIS_CONFIG[nombre]
         img = Image.open(config["file"]).convert("RGBA")
         
-        # Escala: peso 0 -> 30% del original (76px), peso 99 -> 100% (256px)
+        # Escala: peso 0 -> 30% de 512px, peso 99 -> 100% de 512px
         escala = 0.3 + (peso / 99.0) * 0.7
-        nuevo_size = int(256 * escala)
+        nuevo_size = int(512 * escala)
         img = img.resize((nuevo_size, nuevo_size), Image.Resampling.LANCZOS)
         img = img.rotate(config["angle"], expand=True)
         new_w, new_h = img.size
         
-        # 2. Gravedad: los más pesados buscan radio más pequeño hacia el centro
+        # 2. Gravedad adaptada al nuevo tamaño
         factor_gravedad = 1.0 - (peso / 99.0)
-        max_dist = 250 * factor_gravedad
+        max_dist = 500 * factor_gravedad # Radio ampliado para imágenes grandes
         
         for _ in range(500):
             theta = random.uniform(0, 2 * math.pi)
@@ -62,7 +63,6 @@ def generar_nube(pesos):
             x = int(centro_x + r * math.cos(theta) - new_w / 2)
             y = int(centro_y + r * math.sin(theta) - new_h / 2)
             
-            # Margen de colisión del 15%
             margen = int(new_w * 0.15)
             caja = (x + margen, y + margen, x + new_w - margen, y + new_h - margen)
             
@@ -71,16 +71,18 @@ def generar_nube(pesos):
                 cajas_ocupadas.append(caja)
                 break
                 
-    # 3. Recorte: ajustar al contenido real
+    # 3. Recorte final de alta precisión
     bbox = lienzo.getbbox()
     return lienzo.crop(bbox) if bbox else lienzo
 
 # --- Renderizado ---
-if st.button("Generar Nube Gravitacional"):
-    with st.spinner("Calculando órbitas..."):
+if st.button("Generar Nube HD"):
+    with st.spinner("Renderizando en alta definición..."):
         imagen_final = generar_nube(pesos)
-        st.image(imagen_final)
+        # Visualización ajustada en pantalla
+        st.image(imagen_final, use_container_width=True) 
         
         buf = io.BytesIO()
-        imagen_final.save(buf, format="PNG")
-        st.download_button("Descargar Nube", buf.getvalue(), "nube_gravity.png", "image/png")
+        # Guardado en máxima calidad
+        imagen_final.save(buf, format="PNG", optimize=True, compress_level=0)
+        st.download_button("⬇️ Descargar Nube HD", buf.getvalue(), "nube_hd.png", "image/png")
