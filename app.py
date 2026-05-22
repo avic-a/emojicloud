@@ -96,26 +96,22 @@ def generar_nube(pesos):
     return lienzo
 
 # --- Renderizado Final en Pantalla ---
-col1, col2, col3 = st.columns()
-with col2:
-    # Botón opcional para forzar la regeneración de posiciones aleatorias
-    if st.button("🔀 Reorganizar posiciones"):
-        pass # Streamlit recargará el script automáticamente y buscará nuevas coordenadas
+st.markdown("---") # Línea divisoria estética en lugar de columnas
 
-    with st.spinner("Buscando espacios y renderizando..."):
-        imagen_final = generar_nube(pesos)
-        
-        st.image(imagen_final, use_container_width=True)
-        
-        # Buffer para descarga
-        buf = io.BytesIO()
-        imagen_final.save(buf, format="PNG")
-        byte_im = buf.getvalue()
-        
-        st.download_button(
-            label="⬇️ Descargar Nube Transparente",
-            data=byte_im,
-            file_name="nube_reacciones_3d.png",
-            mime="image/png",
-            use_container_width=True
-        )
+with st.spinner("Buscando espacios y renderizando..."):
+    imagen_final = generar_nube(pesos)
+    
+    # Mostrar la imagen centrada de forma estándar
+    st.image(imagen_final)
+    
+    # Buffer para descarga
+    buf = io.BytesIO()
+    imagen_final.save(buf, format="PNG")
+    byte_im = buf.getvalue()
+    
+    st.download_button(
+        label="⬇️ Descargar Nube Transparente",
+        data=byte_im,
+        file_name="nube_reacciones_3d.png",
+        mime="image/png"
+    )
