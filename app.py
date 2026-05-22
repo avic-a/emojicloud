@@ -6,41 +6,37 @@ import io
 import os
 
 # =====================================================
-# CONFIGURACIÓN GENERAL
+# CONFIG
 # =====================================================
 
 st.set_page_config(
-    page_title="Nube Emojis HD",
+    page_title="Emoji Cloud Spiral",
     layout="wide"
 )
 
-st.title("🎨 Nube de Emojis HD")
+st.title("🌀 Emoji Cloud Spiral Packing")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# =====================================================
-# CONFIG EMOJIS
-# =====================================================
 
 EMOJIS_CONFIG = {
     "Like": {
         "file": os.path.join(BASE_DIR, "like.png"),
-        "angle": -6
+        "angle": -8
     },
 
     "Haha": {
         "file": os.path.join(BASE_DIR, "haha.png"),
-        "angle": 5
+        "angle": 6
     },
 
     "Corazón": {
         "file": os.path.join(BASE_DIR, "corazon.png"),
-        "angle": 8
+        "angle": 10
     },
 
     "Angry": {
         "file": os.path.join(BASE_DIR, "angry.png"),
-        "angle": -4
+        "angle": -5
     },
 
     "Sorpresa": {
@@ -72,15 +68,10 @@ for emoji in EMOJIS_CONFIG:
     )
 
 # =====================================================
-# COLISIONES
+# COLLISION POR CÍRCULOS
 # =====================================================
 
-def hay_choque(
-    x,
-    y,
-    radio,
-    elementos
-):
+def hay_choque(x, y, radio, elementos):
 
     for ex, ey, er in elementos:
 
@@ -89,20 +80,35 @@ def hay_choque(
             (y - ey) ** 2
         )
 
-        # padding más robusto
-        padding = min(radio, er) * 0.12
+        # padding muy pequeño
+        padding = min(radio, er) * 0.06
 
-        distancia_minima = (
-            radio + er + padding
-        )
-
-        if distancia < distancia_minima:
+        if distancia < (radio + er + padding):
             return True
 
     return False
 
 # =====================================================
-# GENERADOR
+# ESCALA ESTILO WORDCLOUD
+# =====================================================
+
+def calcular_escala(peso):
+
+    p = peso / 100
+
+    # curva estilo wordcloud
+    escala = (
+        0.09 +
+        (p ** 2.4) * 0.78
+    )
+
+    escala = max(0.07, escala)
+    escala = min(0.82, escala)
+
+    return escala
+
+# =====================================================
+# SPIRAL PACKING
 # =====================================================
 
 def generar_nube(pesos):
@@ -116,15 +122,15 @@ def generar_nube(pesos):
 
         return Image.new(
             "RGBA",
-            (500, 500),
+            (400, 400),
             (0,0,0,0)
         )
 
     # =================================================
-    # CANVAS
+    # CANVAS GRANDE
     # =================================================
 
-    dim = 1200
+    dim = 1600
 
     lienzo = Image.new(
         "RGBA",
@@ -136,7 +142,7 @@ def generar_nube(pesos):
     centro_y = dim // 2
 
     # =================================================
-    # ORDENAR
+    # ORDENAR POR PESO
     # =================================================
 
     emojis_ordenados = sorted(
@@ -147,20 +153,16 @@ def generar_nube(pesos):
 
     elementos = []
 
-    primer = True
-
-    total_emojis = len(emojis_ordenados)
-
     # =================================================
-    # LOOP PRINCIPAL
+    # LOOP
     # =================================================
 
-    for i, (nombre, peso) in enumerate(emojis_ordenados):
+    for idx, (nombre, peso) in enumerate(emojis_ordenados):
 
         config = EMOJIS_CONFIG[nombre]
 
         # =============================================
-        # CARGAR PNG ORIGINAL
+        # CARGAR PNG
         # =============================================
 
         img_original = Image.open(
@@ -168,7 +170,7 @@ def generar_nube(pesos):
         ).convert("RGBA")
 
         # =============================================
-        # ROTAR PRIMERO
+        # ROTACIÓN
         # =============================================
 
         img_original = img_original.rotate(
@@ -178,36 +180,16 @@ def generar_nube(pesos):
         )
 
         # =============================================
-        # NORMALIZAR PESO
+        # ESCALA
         # =============================================
 
-        peso_normalizado = peso / 100
-
-        # =============================================
-        # CURVA MÁS DIFERENCIADA
-        # =============================================
-
-        escala = (
-            0.10 +
-            (peso_normalizado ** 2.7) * 0.62
-        )
-
-        escala = max(0.08, escala)
-        escala = min(0.74, escala)
-
-        # =============================================
-        # TAMAÑO
-        # =============================================
+        escala = calcular_escala(peso)
 
         nuevo_w = int(512 * escala)
         nuevo_h = int(512 * escala)
 
-        nuevo_w = min(nuevo_w, 512)
-        nuevo_h = min(nuevo_h, 512)
-
-        # mínimo visual
-        nuevo_w = max(nuevo_w, 42)
-        nuevo_h = max(nuevo_h, 42)
+        nuevo_w = max(40, nuevo_w)
+        nuevo_h = max(40, nuevo_h)
 
         img = img_original.resize(
             (nuevo_w, nuevo_h),
@@ -217,16 +199,16 @@ def generar_nube(pesos):
         w, h = img.size
 
         # =============================================
-        # RADIO MÁS PRECISO
+        # RADIO REAL
         # =============================================
 
-        radio = int(max(w, h) * 0.41)
+        radio = int(max(w, h) * 0.36)
 
         # =============================================
-        # EMOJI PRINCIPAL
+        # PRIMER EMOJI
         # =============================================
 
-        if primer:
+        if idx == 0:
 
             x = centro_x
             y = centro_y
@@ -244,67 +226,38 @@ def generar_nube(pesos):
                 (x, y, radio)
             )
 
-            primer = False
-
             continue
 
         # =============================================
-        # DISTRIBUCIÓN RADIAL
+        # SPIRAL SEARCH
         # =============================================
 
         colocado = False
 
-        for intento in range(400):
+        # intenta desde el centro hacia afuera
+        for t in range(0, 14000):
 
-            # =========================================
-            # ÁNGULO ESTABLE
-            # =========================================
+            # espiral logarítmica
+            angle = t * 0.15
 
-            angulo_base = (
-                (2 * math.pi / total_emojis)
-                * i
-            )
+            spiral_radius = 2.8 * math.sqrt(t)
 
-            # pequeño jitter
-            angulo = (
-                angulo_base +
-                random.uniform(-0.10, 0.10)
-            )
-
-            radio_principal = elementos[0][2]
-
-            # =========================================
-            # DISTANCIA MEJOR AJUSTADA
-            # =========================================
-
-            distancia_base = (
-                radio_principal * 1.02 +
-                radio * 0.95
-            )
-
-            # pequeños más cerca
-            # grandes más lejos
-            ajuste_peso = (
-                peso_normalizado * 26
-            )
-
-            distancia = (
-                distancia_base +
-                ajuste_peso
-            )
-
-            # expansión gradual si choca
-            distancia += intento * 1.5
+            # leve variación
+            spiral_radius += random.uniform(-1.5, 1.5)
 
             x = int(
                 centro_x +
-                math.cos(angulo) * distancia
+                math.cos(angle) * spiral_radius
             )
 
             y = int(
                 centro_y +
-                math.sin(angulo) * distancia
+                math.sin(angle) * spiral_radius
             )
+
+            # =========================================
+            # CHECK COLISIÓN
+            # =========================================
 
             if not hay_choque(
                 x,
@@ -349,14 +302,14 @@ def generar_nube(pesos):
             )
 
     # =================================================
-    # RECORTE AUTOMÁTICO
+    # CROP AUTOMÁTICO
     # =================================================
 
     bbox = lienzo.getbbox()
 
     if bbox:
 
-        padding = 25
+        padding = 35
 
         left, top, right, bottom = bbox
 
@@ -372,12 +325,12 @@ def generar_nube(pesos):
     return lienzo
 
 # =====================================================
-# BOTÓN
+# RENDER
 # =====================================================
 
 if st.button("✨ Generar Nube"):
 
-    with st.spinner("Renderizando..."):
+    with st.spinner("Renderizando nube..."):
 
         imagen_final = generar_nube(pesos)
 
@@ -400,6 +353,6 @@ if st.button("✨ Generar Nube"):
         st.download_button(
             "⬇️ Descargar PNG",
             data=buf.getvalue(),
-            file_name="nube_emojis_hd.png",
+            file_name="emoji_cloud_spiral.png",
             mime="image/png"
         )
