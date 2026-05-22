@@ -5,102 +5,97 @@ import random
 import io
 import os
 
-# =========================================================
-# CONFIGURACIÓN GENERAL
-# =========================================================
+# =====================================================
+# CONFIG
+# =====================================================
 
 st.set_page_config(
-    page_title="Nube de Emojis HD",
+    page_title="Nube Emojis HD",
     layout="wide"
 )
 
-st.title("Generador de Nube de Emojis")
+st.title("🎨 Nube de Emojis HD")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# =========================================================
-# CONFIG EMOJIS
-# =========================================================
 
 EMOJIS_CONFIG = {
     "Like": {
         "file": os.path.join(BASE_DIR, "like.png"),
-        "angle": -8
+        "angle": -6
     },
 
     "Haha": {
         "file": os.path.join(BASE_DIR, "haha.png"),
-        "angle": 6
+        "angle": 5
     },
 
     "Corazón": {
         "file": os.path.join(BASE_DIR, "corazon.png"),
-        "angle": 10
+        "angle": 8
     },
 
     "Angry": {
         "file": os.path.join(BASE_DIR, "angry.png"),
-        "angle": -5
+        "angle": -4
     },
 
     "Sorpresa": {
         "file": os.path.join(BASE_DIR, "sorpresa.png"),
-        "angle": -12
+        "angle": -10
     },
 
     "Me entristece": {
         "file": os.path.join(BASE_DIR, "triste.png"),
-        "angle": 8
+        "angle": 7
     }
 }
 
-# =========================================================
+# =====================================================
 # SIDEBAR
-# =========================================================
+# =====================================================
 
-st.sidebar.header("⚙️ Configurar pesos")
+st.sidebar.header("⚙️ Pesos")
 
 pesos = {}
 
 for emoji in EMOJIS_CONFIG:
+
     pesos[emoji] = st.sidebar.slider(
         emoji,
-        min_value=0,
-        max_value=100,
-        value=50
+        0,
+        100,
+        50
     )
 
-# =========================================================
-# COLISIONES
-# =========================================================
+# =====================================================
+# COLISIONES CIRCULARES
+# =====================================================
 
-def hay_choque(nueva_caja, cajas_ocupadas, padding=18):
+def hay_choque(
+    x,
+    y,
+    radio,
+    elementos,
+    padding=20
+):
 
-    n_izq, n_arr, n_der, n_aba = nueva_caja
+    for ex, ey, er in elementos:
 
-    # separación visual mínima
-    n_izq -= padding
-    n_arr -= padding
-    n_der += padding
-    n_aba += padding
+        distancia = math.sqrt(
+            (x - ex) ** 2 +
+            (y - ey) ** 2
+        )
 
-    for caja in cajas_ocupadas:
+        distancia_minima = radio + er + padding
 
-        c_izq, c_arr, c_der, c_aba = caja
-
-        if not (
-            n_der < c_izq or
-            n_izq > c_der or
-            n_aba < c_arr or
-            n_arr > c_aba
-        ):
+        if distancia < distancia_minima:
             return True
 
     return False
 
-# =========================================================
+# =====================================================
 # GENERADOR
-# =========================================================
+# =====================================================
 
 def generar_nube(pesos):
 
@@ -110,192 +105,174 @@ def generar_nube(pesos):
     }
 
     if not activos:
+
         return Image.new(
             "RGBA",
-            (512, 512),
-            (0, 0, 0, 0)
+            (500, 500),
+            (0,0,0,0)
         )
 
-    # =====================================================
+    # =================================================
     # CANVAS
-    # =====================================================
+    # =================================================
 
-    dim = 1400
+    dim = 1200
 
     lienzo = Image.new(
         "RGBA",
         (dim, dim),
-        (255, 255, 255, 0)
+        (255,255,255,0)
     )
 
     centro_x = dim // 2
     centro_y = dim // 2
 
-    # =====================================================
-    # ORDENAR POR PESO
-    # =====================================================
+    # =================================================
+    # ORDEN
+    # =================================================
 
     emojis_ordenados = sorted(
         activos.items(),
-        key=lambda item: item[1],
+        key=lambda x: x[1],
         reverse=True
     )
 
-    cajas_ocupadas = []
+    elementos = []
 
-    # =====================================================
-    # ESCALA
-    # =====================================================
+    primer = True
 
-    MIN_SIZE = 70
-    MAX_SIZE = 250
-
-    primer_emoji = True
-
-    # =====================================================
-    # GENERAR EMOJIS
-    # =====================================================
+    # =================================================
+    # LOOP
+    # =================================================
 
     for nombre, peso in emojis_ordenados:
 
         config = EMOJIS_CONFIG[nombre]
 
-        # =================================================
-        # CARGAR IMAGEN
-        # =================================================
+        # =============================================
+        # ABRIR ORIGINAL 512PX
+        # =============================================
 
-        img = Image.open(
+        img_original = Image.open(
             config["file"]
         ).convert("RGBA")
 
-        # =================================================
+        # =============================================
         # ROTAR PRIMERO
-        # =================================================
+        # =============================================
 
-        img = img.rotate(
+        img_original = img_original.rotate(
             config["angle"],
             expand=True,
             resample=Image.Resampling.BICUBIC
         )
 
-        # =================================================
-        # TAMAÑO CONTROLADO
-        # =================================================
+        ow, oh = img_original.size
 
-        nuevo_size = int(
-            MIN_SIZE +
-            (
-                (peso / 100.0) *
-                (MAX_SIZE - MIN_SIZE)
-            )
-        )
+        # =============================================
+        # ESCALA SOLO HACIA ABAJO
+        # =============================================
 
-        img = img.resize(
-            (nuevo_size, nuevo_size),
+        # Nunca superar tamaño original
+        escala = 0.22 + ((peso / 100) * 0.42)
+
+        nuevo_w = int(512 * escala)
+        nuevo_h = int(512 * escala)
+
+        # Protección absoluta
+        nuevo_w = min(nuevo_w, 512)
+        nuevo_h = min(nuevo_h, 512)
+
+        img = img_original.resize(
+            (nuevo_w, nuevo_h),
             Image.Resampling.LANCZOS
         )
 
-        new_w, new_h = img.size
+        w, h = img.size
 
-        # =================================================
-        # PRIMER EMOJI CENTRADO
-        # =================================================
+        radio = int(max(w, h) * 0.42)
 
-        if primer_emoji:
+        # =============================================
+        # PRIMER EMOJI
+        # =============================================
 
-            x = centro_x - new_w // 2
-            y = centro_y - new_h // 2
+        if primer:
 
-            caja = (
-                x,
-                y,
-                x + new_w,
-                y + new_h
-            )
+            x = centro_x
+            y = centro_y
 
             lienzo.paste(
                 img,
-                (x, y),
+                (
+                    x - w // 2,
+                    y - h // 2
+                ),
                 img
             )
 
-            cajas_ocupadas.append(caja)
+            elementos.append(
+                (x, y, radio)
+            )
 
-            primer_emoji = False
+            primer = False
 
             continue
 
-        # =================================================
+        # =============================================
         # DISTRIBUCIÓN COMPACTA
-        # =================================================
-
-        max_dist = 130 - (peso * 0.8)
-        max_dist = max(30, max_dist)
+        # =============================================
 
         colocado = False
 
-        for _ in range(3000):
+        for _ in range(6000):
 
-            theta = random.uniform(
+            angulo = random.uniform(
                 0,
                 2 * math.pi
             )
 
-            r = abs(
-                random.gauss(
-                    0,
-                    max_dist / 2
-                )
+            distancia = random.uniform(
+                radio + 20,
+                240
             )
 
             x = int(
                 centro_x +
-                r * math.cos(theta) -
-                new_w // 2
+                math.cos(angulo) * distancia
             )
 
             y = int(
                 centro_y +
-                r * math.sin(theta) -
-                new_h // 2
-            )
-
-            caja = (
-                x,
-                y,
-                x + new_w,
-                y + new_h
+                math.sin(angulo) * distancia
             )
 
             if not hay_choque(
-                caja,
-                cajas_ocupadas
+                x,
+                y,
+                radio,
+                elementos
             ):
 
                 lienzo.paste(
                     img,
-                    (x, y),
+                    (
+                        x - w // 2,
+                        y - h // 2
+                    ),
                     img
                 )
 
-                cajas_ocupadas.append(caja)
+                elementos.append(
+                    (x, y, radio)
+                )
 
                 colocado = True
 
                 break
 
-        # fallback
-        if not colocado:
-
-            lienzo.paste(
-                img,
-                (centro_x, centro_y),
-                img
-            )
-
-    # =====================================================
+    # =================================================
     # RECORTE AUTOMÁTICO
-    # =====================================================
+    # =================================================
 
     bbox = lienzo.getbbox()
 
@@ -316,9 +293,9 @@ def generar_nube(pesos):
 
     return lienzo
 
-# =========================================================
-# BOTÓN GENERAR
-# =========================================================
+# =====================================================
+# BOTÓN
+# =====================================================
 
 if st.button("✨ Generar Nube"):
 
@@ -331,21 +308,20 @@ if st.button("✨ Generar Nube"):
             use_container_width=True
         )
 
-        # =================================================
+        # =============================================
         # DESCARGA
-        # =================================================
+        # =============================================
 
         buf = io.BytesIO()
 
         imagen_final.save(
             buf,
-            format="PNG",
-            optimize=True
+            format="PNG"
         )
 
         st.download_button(
             "⬇️ Descargar PNG",
             data=buf.getvalue(),
-            file_name="nube_emojis.png",
+            file_name="nube_emojis_hd.png",
             mime="image/png"
         )
