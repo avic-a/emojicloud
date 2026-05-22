@@ -1,5 +1,5 @@
 import streamlit as st
-from PIL import Image, ImageFilter
+from PIL import Image
 import math
 import random
 import io
@@ -14,7 +14,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🎨 Generador de Nube de Emojis HD")
+st.title("Generador de Nube de Emojis")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -35,7 +35,7 @@ EMOJIS_CONFIG = {
 
     "Corazón": {
         "file": os.path.join(BASE_DIR, "corazon.png"),
-        "angle": 12
+        "angle": 10
     },
 
     "Angry": {
@@ -45,7 +45,7 @@ EMOJIS_CONFIG = {
 
     "Sorpresa": {
         "file": os.path.join(BASE_DIR, "sorpresa.png"),
-        "angle": -14
+        "angle": -12
     },
 
     "Me entristece": {
@@ -71,36 +71,35 @@ for emoji in EMOJIS_CONFIG:
     )
 
 # =========================================================
-# FUNCIÓN DE COLISIÓN SUAVE
+# COLISIONES
 # =========================================================
 
-def hay_choque(nueva_caja, cajas_ocupadas, tolerancia=0.20):
+def hay_choque(nueva_caja, cajas_ocupadas, padding=18):
 
     n_izq, n_arr, n_der, n_aba = nueva_caja
+
+    # separación visual mínima
+    n_izq -= padding
+    n_arr -= padding
+    n_der += padding
+    n_aba += padding
 
     for caja in cajas_ocupadas:
 
         c_izq, c_arr, c_der, c_aba = caja
 
-        overlap_x = min(n_der, c_der) - max(n_izq, c_izq)
-        overlap_y = min(n_aba, c_aba) - max(n_arr, c_arr)
-
-        if overlap_x > 0 and overlap_y > 0:
-
-            area_overlap = overlap_x * overlap_y
-
-            area_nueva = (
-                (n_der - n_izq) *
-                (n_aba - n_arr)
-            )
-
-            if area_overlap > area_nueva * tolerancia:
-                return True
+        if not (
+            n_der < c_izq or
+            n_izq > c_der or
+            n_aba < c_arr or
+            n_arr > c_aba
+        ):
+            return True
 
     return False
 
 # =========================================================
-# GENERADOR PRINCIPAL
+# GENERADOR
 # =========================================================
 
 def generar_nube(pesos):
@@ -145,11 +144,13 @@ def generar_nube(pesos):
     cajas_ocupadas = []
 
     # =====================================================
-    # CONTROL DE ESCALA
+    # ESCALA
     # =====================================================
 
-    MIN_SIZE = 90
-    MAX_SIZE = 340
+    MIN_SIZE = 70
+    MAX_SIZE = 250
+
+    primer_emoji = True
 
     # =====================================================
     # GENERAR EMOJIS
@@ -168,7 +169,7 @@ def generar_nube(pesos):
         ).convert("RGBA")
 
         # =================================================
-        # ROTAR PRIMERO (MEJOR CALIDAD)
+        # ROTAR PRIMERO
         # =================================================
 
         img = img.rotate(
@@ -178,7 +179,7 @@ def generar_nube(pesos):
         )
 
         # =================================================
-        # ESCALA LIMITADA
+        # TAMAÑO CONTROLADO
         # =================================================
 
         nuevo_size = int(
@@ -197,22 +198,49 @@ def generar_nube(pesos):
         new_w, new_h = img.size
 
         # =================================================
-        # DISTRIBUCIÓN GRAVITACIONAL
+        # PRIMER EMOJI CENTRADO
         # =================================================
 
-        max_dist = 180 - (peso * 1.2)
-        max_dist = max(40, max_dist)
+        if primer_emoji:
+
+            x = centro_x - new_w // 2
+            y = centro_y - new_h // 2
+
+            caja = (
+                x,
+                y,
+                x + new_w,
+                y + new_h
+            )
+
+            lienzo.paste(
+                img,
+                (x, y),
+                img
+            )
+
+            cajas_ocupadas.append(caja)
+
+            primer_emoji = False
+
+            continue
+
+        # =================================================
+        # DISTRIBUCIÓN COMPACTA
+        # =================================================
+
+        max_dist = 130 - (peso * 0.8)
+        max_dist = max(30, max_dist)
 
         colocado = False
 
-        for _ in range(2500):
+        for _ in range(3000):
 
             theta = random.uniform(
                 0,
                 2 * math.pi
             )
 
-            # distribución compacta
             r = abs(
                 random.gauss(
                     0,
@@ -244,30 +272,6 @@ def generar_nube(pesos):
                 cajas_ocupadas
             ):
 
-                # =========================================
-                # SOMBRA SUAVE
-                # =========================================
-
-                shadow = Image.new(
-                    "RGBA",
-                    img.size,
-                    (0, 0, 0, 70)
-                )
-
-                shadow = shadow.filter(
-                    ImageFilter.GaussianBlur(14)
-                )
-
-                lienzo.paste(
-                    shadow,
-                    (x + 10, y + 14),
-                    shadow
-                )
-
-                # =========================================
-                # PEGAR EMOJI
-                # =========================================
-
                 lienzo.paste(
                     img,
                     (x, y),
@@ -297,7 +301,7 @@ def generar_nube(pesos):
 
     if bbox:
 
-        padding = 50
+        padding = 40
 
         left, top, right, bottom = bbox
 
@@ -316,9 +320,9 @@ def generar_nube(pesos):
 # BOTÓN GENERAR
 # =========================================================
 
-if st.button("✨ Generar Nube HD"):
+if st.button("✨ Generar Nube"):
 
-    with st.spinner("Renderizando nube..."):
+    with st.spinner("Renderizando..."):
 
         imagen_final = generar_nube(pesos)
 
@@ -328,7 +332,7 @@ if st.button("✨ Generar Nube HD"):
         )
 
         # =================================================
-        # DESCARGA PNG
+        # DESCARGA
         # =================================================
 
         buf = io.BytesIO()
@@ -342,6 +346,6 @@ if st.button("✨ Generar Nube HD"):
         st.download_button(
             "⬇️ Descargar PNG",
             data=buf.getvalue(),
-            file_name="nube_emojis_hd.png",
+            file_name="nube_emojis.png",
             mime="image/png"
         )
