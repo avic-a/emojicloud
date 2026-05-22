@@ -1,16 +1,14 @@
 import streamlit as st
 from PIL import Image
+import math
 import random
 import io
 
-# --- Configuración de la página ---
+# --- Configuración de página ---
 st.set_page_config(page_title="Nube de Emojis 3D", layout="wide")
+st.title("Generador de Nube Gravitacional")
 
-st.title("Generador de Nube de Emojis 3D")
-st.markdown("Ajusta los pesos (0-99) en la barra lateral para escalar dinámicamente cada emoji. La posición se calculará automáticamente para evitar choques.")
-
-# --- Configuración de Emojis ---
-# Nombre, archivo local y ángulo de rotación (ya no necesitamos 'pos' fija)
+# --- Configuración ---
 EMOJIS_CONFIG = {
     "Like": {"file": "like.png", "angle": -10},
     "Haha": {"file": "haha.png", "angle": 5},
@@ -20,98 +18,69 @@ EMOJIS_CONFIG = {
     "Me entristece": {"file": "triste.png", "angle": 10}
 }
 
-# --- Barra lateral de controles ---
 st.sidebar.header("Configurar Pesos")
-st.sidebar.markdown("Define la relevancia de cada reacción:")
+pesos = {emoji: st.sidebar.slider(f"{emoji}", 0, 99, 50) for emoji in EMOJIS_CONFIG}
 
-pesos = {}
-for emoji in EMOJIS_CONFIG.keys():
-    pesos[emoji] = st.sidebar.slider(f"{emoji}", min_value=0, max_value=99, value=50)
-
-# --- Constantes del Lienzo ---
-CANVAS_WIDTH = 800
-CANVAS_HEIGHT = 600
-MAX_EMOJI_SIZE = 350 # Tamaño en píxeles al alcanzar el peso de 99
-
-# --- Funciones Core ---
 def hay_choque(nueva_caja, cajas_ocupadas):
-    """Verifica si la nueva caja delimitadora choca con alguna ya existente."""
     n_izq, n_arr, n_der, n_aba = nueva_caja
-    
     for caja in cajas_ocupadas:
         c_izq, c_arr, c_der, c_aba = caja
         if not (n_der < c_izq or n_izq > c_der or n_aba < c_arr or n_arr > c_aba):
-            return True # Hay choque
-    return False # Espacio libre
+            return True
+    return False
 
 def generar_nube(pesos):
-    """Genera la imagen final acomodando los emojis según su peso."""
-    lienzo = Image.new("RGBA", (CANVAS_WIDTH, CANVAS_HEIGHT), (255, 255, 255, 0))
+    activos = {k: v for k, v in pesos.items() if v > 0}
+    if not activos: return Image.new("RGBA", (256, 256), (0,0,0,0))
     
-    # Ordenar emojis de MAYOR a MENOR peso para acomodar primero los grandes
-    emojis_ordenados = sorted(pesos.items(), key=lambda item: item, reverse=True)
+    # 1. Lienzo inicial grande para trabajar
+    dim = 1200 
+    lienzo = Image.new("RGBA", (dim, dim), (255, 255, 255, 0))
+    centro_x, centro_y = dim // 2, dim // 2
+    
+    emojis_ordenados = sorted(activos.items(), key=lambda item: item, reverse=True)
     cajas_ocupadas = []
 
     for nombre, peso in emojis_ordenados:
-        if peso == 0:
-            continue
-            
         config = EMOJIS_CONFIG[nombre]
+        img = Image.open(config["file"]).convert("RGBA")
         
-        try:
-            img_emoji = Image.open(config["file"]).convert("RGBA")
-        except FileNotFoundError:
-            st.sidebar.warning(f"⚠️ Falta la imagen '{config['file']}' en tu carpeta.")
-            continue
-            
-        # Calcular tamaño y redimensionar
-        size = int(20 + (peso / 99.0) * (MAX_EMOJI_SIZE - 20))
-        img_emoji = img_emoji.resize((size, size), Image.Resampling.LANCZOS)
+        # Escala: peso 0 -> 30% del original (76px), peso 99 -> 100% (256px)
+        escala = 0.3 + (peso / 99.0) * 0.7
+        nuevo_size = int(256 * escala)
+        img = img.resize((nuevo_size, nuevo_size), Image.Resampling.LANCZOS)
+        img = img.rotate(config["angle"], expand=True)
+        new_w, new_h = img.size
         
-        # Rotar
-        img_emoji = img_emoji.rotate(config["angle"], expand=True)
-        new_w, new_h = img_emoji.size
+        # 2. Gravedad: los más pesados buscan radio más pequeño hacia el centro
+        factor_gravedad = 1.0 - (peso / 99.0)
+        max_dist = 250 * factor_gravedad
         
-        # Lógica de posicionamiento aleatorio con detección de colisión
-        lugar_encontrado = False
-        for intento in range(200): # Intentar hasta 200 veces por emoji
-            x = random.randint(0, CANVAS_WIDTH - new_w)
-            y = random.randint(0, CANVAS_HEIGHT - new_h)
+        for _ in range(500):
+            theta = random.uniform(0, 2 * math.pi)
+            r = random.uniform(0, max_dist)
+            x = int(centro_x + r * math.cos(theta) - new_w / 2)
+            y = int(centro_y + r * math.sin(theta) - new_h / 2)
             
-            # Reducir la caja de colisión un 15% para que puedan juntarse de forma más estética
-            margen_x = int(new_w * 0.15)
-            margen_y = int(new_h * 0.15)
-            caja_actual = (x + margen_x, y + margen_y, x + new_w - margen_x, y + new_h - margen_y)
+            # Margen de colisión del 15%
+            margen = int(new_w * 0.15)
+            caja = (x + margen, y + margen, x + new_w - margen, y + new_h - margen)
             
-            if not hay_choque(caja_actual, cajas_ocupadas):
-                # Si hay espacio, se pega en el lienzo
-                lienzo.paste(img_emoji, (x, y), img_emoji)
-                cajas_ocupadas.append(caja_actual)
-                lugar_encontrado = True
+            if not hay_choque(caja, cajas_ocupadas):
+                lienzo.paste(img, (x, y), img)
+                cajas_ocupadas.append(caja)
                 break
                 
-        if not lugar_encontrado:
-            st.warning(f"⚠️ El lienzo está muy lleno. No hubo espacio para '{nombre}'.")
-            
-    return lienzo
+    # 3. Recorte: ajustar al contenido real
+    bbox = lienzo.getbbox()
+    return lienzo.crop(bbox) if bbox else lienzo
 
-# --- Renderizado Final en Pantalla ---
-st.markdown("---") # Línea divisoria estética en lugar de columnas
-
-with st.spinner("Buscando espacios y renderizando..."):
-    imagen_final = generar_nube(pesos)
-    
-    # Mostrar la imagen centrada de forma estándar
-    st.image(imagen_final)
-    
-    # Buffer para descarga
-    buf = io.BytesIO()
-    imagen_final.save(buf, format="PNG")
-    byte_im = buf.getvalue()
-    
-    st.download_button(
-        label="⬇️ Descargar Nube Transparente",
-        data=byte_im,
-        file_name="nube_reacciones_3d.png",
-        mime="image/png"
-    )
+# --- Renderizado ---
+if st.button("Generar Nube Gravitacional"):
+    with st.spinner("Calculando órbitas..."):
+        imagen_final = generar_nube(pesos)
+        st.image(imagen_final)
+        
+        buf = io.BytesIO()
+        imagen_final.save(buf, format="PNG")
+        st.download_button("Descargar Nube", buf.getvalue(), "nube_gravity.png", "image/png")
