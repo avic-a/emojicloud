@@ -89,8 +89,8 @@ def hay_choque(
             (y - ey) ** 2
         )
 
-        # separación suave
-        padding = min(radio, er) * 0.08
+        # padding más robusto
+        padding = min(radio, er) * 0.12
 
         distancia_minima = (
             radio + er + padding
@@ -178,19 +178,22 @@ def generar_nube(pesos):
         )
 
         # =============================================
-        # ESCALA BALANCEADA
+        # NORMALIZAR PESO
         # =============================================
 
         peso_normalizado = peso / 100
 
+        # =============================================
+        # CURVA MÁS DIFERENCIADA
+        # =============================================
+
         escala = (
-            0.16 +
-            (peso_normalizado ** 2.2) * 0.50
+            0.10 +
+            (peso_normalizado ** 2.7) * 0.62
         )
 
-        # límites reales
-        escala = max(0.14, escala)
-        escala = min(0.72, escala)
+        escala = max(0.08, escala)
+        escala = min(0.74, escala)
 
         # =============================================
         # TAMAÑO
@@ -202,9 +205,9 @@ def generar_nube(pesos):
         nuevo_w = min(nuevo_w, 512)
         nuevo_h = min(nuevo_h, 512)
 
-        # protección mínima
-        nuevo_w = max(nuevo_w, 60)
-        nuevo_h = max(nuevo_h, 60)
+        # mínimo visual
+        nuevo_w = max(nuevo_w, 42)
+        nuevo_h = max(nuevo_h, 42)
 
         img = img_original.resize(
             (nuevo_w, nuevo_h),
@@ -214,10 +217,10 @@ def generar_nube(pesos):
         w, h = img.size
 
         # =============================================
-        # RADIO
+        # RADIO MÁS PRECISO
         # =============================================
 
-        radio = int(max(w, h) * 0.36)
+        radio = int(max(w, h) * 0.41)
 
         # =============================================
         # EMOJI PRINCIPAL
@@ -251,9 +254,12 @@ def generar_nube(pesos):
 
         colocado = False
 
-        for intento in range(300):
+        for intento in range(400):
 
-            # distribución angular estable
+            # =========================================
+            # ÁNGULO ESTABLE
+            # =========================================
+
             angulo_base = (
                 (2 * math.pi / total_emojis)
                 * i
@@ -262,30 +268,32 @@ def generar_nube(pesos):
             # pequeño jitter
             angulo = (
                 angulo_base +
-                random.uniform(-0.12, 0.12)
+                random.uniform(-0.10, 0.10)
             )
 
             radio_principal = elementos[0][2]
 
             # =========================================
-            # DISTANCIAS MEJOR BALANCEADAS
+            # DISTANCIA MEJOR AJUSTADA
             # =========================================
 
-            factor_peso = (
-                1.0 - peso_normalizado
+            distancia_base = (
+                radio_principal * 1.02 +
+                radio * 0.95
             )
 
-            distancia_base = (
-                radio_principal * 0.92 +
-                radio * 0.92
+            # pequeños más cerca
+            # grandes más lejos
+            ajuste_peso = (
+                peso_normalizado * 26
             )
 
             distancia = (
                 distancia_base +
-                (factor_peso * 34)
+                ajuste_peso
             )
 
-            # expansión gradual
+            # expansión gradual si choca
             distancia += intento * 1.5
 
             x = int(
