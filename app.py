@@ -116,8 +116,8 @@ def generar_nube(pesos, radio_circulo):
         nuevo_h = int(512 * escala)
 
         # MÍNIMO 60x60 para mantener calidad visible
-        nuevo_w = max(60, nuevo_w)
-        nuevo_h = max(60, nuevo_h)
+        nuevo_w = max(25, nuevo_w)
+        nuevo_h = max(25, nuevo_h)
         # NUNCA agrandar más de 512 (respetar original)
         nuevo_w = min(512, nuevo_w)
         nuevo_h = min(512, nuevo_h)
